@@ -51,12 +51,12 @@ func neofetch() -> String {
             return "Neofetch not found at \(path). Please ensure it's installed correctly."
         }
         
-        let result = shell("which neofetch")
+        let result = shell("which neofetch", in: "~")
         if result.isEmpty {
             return "Neofetch not found in PATH. Please ensure it's installed correctly."
         }
         
-        let manualrun = shell("/usr/local/bin/neofetch")
+        let manualrun = shell("/usr/local/bin/neofetch", in: "~")
         if !manualrun.isEmpty {
             return "Failed to run neofetch: \(err)\nManual execution result:\n\(manualrun)"
         }
@@ -65,10 +65,11 @@ func neofetch() -> String {
     }
 }
 
-func shell(_ command: String) -> String {
+func shell(_ command: String, in directory: String) -> String {
     let task = Process()
     task.launchPath = "/bin/zsh"
     task.arguments = ["-c", command]
+    task.currentDirectoryPath = directory
     
     let pipe = Pipe()
     task.standardOutput = pipe
@@ -79,12 +80,14 @@ func shell(_ command: String) -> String {
         
               let data = pipe.fileHandleForReading.readDataToEndOfFile()
               guard let output = String(data: data, encoding: .utf8) else {
+            task.terminate()
             return ""
         }
-        
-        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        task.terminate()
+        return output
     } catch {
-        return "Error executing command: \(error.localizedDescription)"
+        task.terminate()
+        return error.localizedDescription
     }
 }
 
@@ -106,7 +109,7 @@ func directory() -> String {
 
 
 // absoulte nonsense
-struct OutputView: View {
+struct ContentView: View {
     @State private var output: [String] = []
     @State private var input: String = ""
     @State private var dir = directory()
@@ -123,9 +126,11 @@ struct OutputView: View {
                     .padding()
                     .frame(maxWidth: lefcw, maxHeight: lefhw, alignment: .center)
                     .background(Color.gray.opacity(0.1))
-                    .padding()
+                    .padding(.leading, 5)
+                    .padding(.trailing, 5)
+                    .padding(.top)
                 ScrollView {
-                    Text("\(dir)\n\n\(shell("ls"))")
+                    Text("\(dir)\n\n\(shell("ls", in: "~"))")
                         .font(.system(.body, design: .monospaced))
                         .padding()
                         .frame(
@@ -135,9 +140,12 @@ struct OutputView: View {
                             alignment: .leading
                         )
                         .background(Color.gray.opacity(0.1))
-                        .padding()
+                        .padding(.top, 1)
+                        .padding(.leading, 5)
+                        .padding(.trailing, 5)
                 }
             }
+
             ScrollView {
                 VStack(spacing: 10) {
                     if output.isEmpty {
@@ -147,21 +155,19 @@ struct OutputView: View {
                             .frame(idealHeight: 75)
                             .frame(alignment: .top)
                     } else {
-                        ForEach(output, id: \.self) { stdout in
-                            Text(stdout)
+                        ForEach(output, id: \.self) { stdout in Text(stdout)
                                 .font(.system(.body, design: .monospaced))
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(minHeight: 75, maxHeight: 250)
-                                .frame(idealHeight: 75)
+                                .frame(minHeight: 75, maxHeight: 450)
                                 .frame(alignment: .top)
                                 .background(Color.gray.opacity(0.1))
                         }
                     }
                 }
-                .padding()
             }
             .background(Color.gray.opacity(0.1))
             .padding(.top)
+            .padding(.leading, 5)
             .frame(minHeight: 500)
         }
         .frame(maxHeight: .infinity)
@@ -181,15 +187,33 @@ struct OutputView: View {
         .padding()
     }
     func Show(_ cmd: String) {
+        if cmd.hasPrefix("cd") {
+            let arg = cmd.split(separator: " ", maxSplits: 1).map(String.init)
+            if arg.count > 1 {
+                let nd = arg[1]
+                cd(to: nd)
+            }
+        }
         output.append("\n  \(date.description.prefix(20))\n   % \(cmd)\n")
-        output.append(shell(cmd))
+        output.append(shell(cmd, in: dir))
         input = ""
     }
-}
-
-struct ContentView: View {
-    var body: some View {
-        OutputView()
+    func cd(to nd: String) -> Void {
+        let fm = FileManager.default
+            var tg: String
+            if nd == "~" {
+                tg = fm.homeDirectoryForCurrentUser.path
+            } else if nd.hasPrefix("/") {
+                tg = nd
+            } else {
+                tg = "\(dir)/\(nd)"
+            }
+            
+            if fm.changeCurrentDirectoryPath(tg) {
+                dir = fm.currentDirectoryPath
+            } else {
+                output.append("cd: no such file or directory: \(nd)\n")
+        }
     }
 }
 
