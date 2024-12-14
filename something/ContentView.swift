@@ -88,14 +88,32 @@ func shell(_ command: String) -> String {
     }
 }
 
+func directory() -> String {
+    let fm = FileManager.default
+    let currpath = fm.currentDirectoryPath
+    let home = fm.homeDirectoryForCurrentUser.path
+    
+    if currpath == home {
+        return "~"
+    }
+    else if currpath.hasPrefix(home) {
+        let rel = currpath.replacingOccurrences(of: home, with: "~")
+        return rel
+    } else {
+        return currpath
+    }
+}
+
 
 // absoulte nonsence
 struct OutputView: View {
     @State private var output: [String] = []
     @State private var input: String = ""
+    @State private var dir = directory()
     
     let start = neofetch()
     let lefcw: CGFloat? = 400
+    let lefhw: CGFloat? = 250
     
     var body: some View {
         HStack(spacing: 0) {
@@ -103,13 +121,22 @@ struct OutputView: View {
                 Text(start)
                     .font(.system(.body, design: .monospaced))
                     .padding()
-                    .frame(maxWidth: lefcw, alignment: .top)
+                    .frame(maxWidth: lefcw, maxHeight: lefhw, alignment: .center)
                     .background(Color.gray.opacity(0.1))
-                Text("some text and info maybe")
-                    .font(.system(.body, design: .monospaced))
                     .padding()
-                    .frame(maxWidth: lefcw, alignment: .top)
-                    .background(Color.gray.opacity(0.1))
+                ScrollView {
+                    Text("\(dir)\n\n\(shell("ls"))")
+                        .font(.system(.body, design: .monospaced))
+                        .padding()
+                        .frame(
+                            maxWidth: lefcw,
+                            minHeight: lefhw,
+                            maxHeight: .infinity,
+                            alignment: .leading
+                        )
+                        .background(Color.gray.opacity(0.1))
+                        .padding()
+                }
             }
             ScrollView {
                 VStack(spacing: 10) {
@@ -119,7 +146,6 @@ struct OutputView: View {
                             .frame(minHeight: 75, maxHeight: 250)
                             .frame(idealHeight: 75)
                             .frame(alignment: .top)
-                            .background(Color.gray.opacity(0.1))
                     } else {
                         ForEach(output, id: \.self) { stdout in
                             Text(stdout)
@@ -133,22 +159,26 @@ struct OutputView: View {
                     }
                 }
                 .padding()
-            }        }
-            .frame(maxHeight: .infinity)
-            .padding()
-        
-            HStack {
-                TextField("Enter command", text: $input)
-                    .font(.system(.body, design: .monospaced))
-                    .textFieldStyle(.plain)
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .frame(maxWidth: .infinity)
-                    .onSubmit {
-                        Show(input)
-                    }
             }
-            .padding()
+            .background(Color.gray.opacity(0.1))
+            .padding(.top)
+            .frame(minHeight: 500)
+        }
+        .frame(maxHeight: .infinity)
+        
+        HStack {
+            TextField("Enter command", text: $input)
+                .font(.system(.body, design: .monospaced))
+                .textFieldStyle(.plain)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity)
+                .onSubmit {
+                    dir = directory()
+                    Show(input)
+                }
+        }
+        .padding()
     }
     func Show(_ cmd: String) {
         output.append("\n  \(date.description.prefix(20))\n   % \(cmd)\n")
