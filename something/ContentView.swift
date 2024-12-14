@@ -105,7 +105,7 @@ func directory() -> String {
 }
 
 
-// absoulte nonsence
+// absoulte nonsense
 struct OutputView: View {
     @State private var output: [String] = []
     @State private var input: String = ""
